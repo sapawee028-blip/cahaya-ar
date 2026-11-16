@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAHAYA AR Scanner</title>
+    
+    <!-- เรียกใช้งาน Tailwind CSS สำหรับจัดระเบียบหน้าตา UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- เรียกใช้งาน A-Frame และ MindAR สำหรับทำ AR ผ่านเว็บ -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* ตกแต่งกรอบสแกน (Scanner Frame) */
+        .scan-frame {
+            width: 280px;
+            height: 280px;
+            position: relative;
+        }
+
+        /* สร้างมุมกรอบทั้ง 4 ด้านให้ดูเหมือนกล้องสแกน */
+        .scan-frame::before, .scan-frame::after,
+        .scan-frame-inner::before, .scan-frame-inner::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-color: #ffffff;
+            border-style: solid;
+        }
+
+        /* มุมซ้ายบน */
+        .scan-frame::before {
+            top: 0; left: 0;
+            border-width: 4px 0 0 4px;
+        }
+        /* มุมขวาบน */
+        .scan-frame::after {
+            top: 0; right: 0;
+            border-width: 4px 4px 0 0;
+        }
+        /* มุมซ้ายล่าง */
+        .scan-frame-inner::before {
+            bottom: 0; left: 0;
+            border-width: 0 0 4px 4px;
+        }
+        /* มุมขวาล่าง */
+        .scan-frame-inner::after {
+            bottom: 0; right: 0;
+            border-width: 0 4px 4px 0;
+        }
+
+        /* อนิเมชันเส้นสแกนวิ่งขึ้นลง (Scanline) */
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background-color: #ff3b3b;
+            position: absolute;
+            top: 0;
+            box-shadow: 0 0 10px #ff3b3b;
+            animation: scan 2s infinite linear;
+        }
+
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- หน้าต่าง UI Overlay ที่จะแสดงกรอบสแกน (จะทำงานอัตโนมัติผ่าน uiScanning ใน a-scene) -->
+    <div id="scanning-overlay" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+        
+        <!-- ข้อความแนะนำ -->
+        <div class="mb-6 text-white text-center">
+            <h1 class="text-2xl font-bold tracking-wider mb-2">CAHAYA</h1>
+            <p class="text-sm text-gray-200">เล็งกล้องไปที่ภาพวาดเพื่อรับชมวิดีโอ</p>
+        </div>
+
+        <!-- กรอบเล็งภาพ -->
+        <div class="scan-frame">
+            <div class="scan-frame-inner w-full h-full relative">
+                <div class="scan-line"></div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 
+      ส่วนของ A-Frame AR Scene 
+      - imageTargetSrc: ระบุไฟล์ .mind ที่คุณสร้างมา
+      - uiScanning: ระบุ ID ของหน้าต่างกรอบสแกน (เราใช้ #scanning-overlay)
+    -->
+    <a-scene 
+        mindar-image="imageTargetSrc: cahaya.mind; uiScanning: #scanning-overlay;" 
+        color-space="sRGB" 
+        renderer="colorManagement: true, physicallyCorrectLights" 
+        vr-mode-ui="enabled: false" 
+        device-orientation-permission-ui="enabled: false">
+        
+        <a-assets>
+            <!-- 
+              โหลดไฟล์วิดีโอ 
+              **จุดสำคัญ**: ต้องมี muted (ปิดเสียงเริ่มต้น) ไม่เช่นนั้นเบราว์เซอร์จะไม่ยอมให้เล่นวิดีโออัตโนมัติ
+            -->
+            <video id="ar-video" src="video.mp4" preload="auto" loop muted playsinline webkit-playsinline></video>
+        </a-assets>
+
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <!-- จุดเป้าหมายที่รอตรวจจับภาพ (targetIndex: 0 คือภาพแรกในไฟล์ .mind) -->
+        <a-entity id="target" mindar-image-target="targetIndex: 0">
+            <!-- 
+              วิดีโอที่จะเล่นทับภาพ 
+              (width และ height ควรปรับสัดส่วนให้ตรงกับภาพของจริง เช่น กว้าง 1.5 สูง 1)
+            -->
+            <a-video src="#ar-video" position="0 0 0" height="1" width="1.5" rotation="0 0 0"></a-video>
+        </a-entity>
+        
+    </a-scene>
+
+    <script>
+        // โค้ด JavaScript สำหรับควบคุมการเล่นวิดีโอให้สมูท
+        document.addEventListener("DOMContentLoaded", function() {
+            const target = document.querySelector('#target');
+            const video = document.querySelector('#ar-video');
+
+            // เมื่อกล้องสแกนเจอภาพ (Target Found)
+            target.addEventListener("targetFound", event => {
+                console.log("พบภาพแล้ว!");
+                // ให้วิดีโอเริ่มเล่น
+                video.play();
+            });
+
+            // เมื่อกล้องหลุดออกจากภาพ (Target Lost)
+            target.addEventListener("targetLost", event => {
+                console.log("หลุดโฟกัสจากภาพ");
+                // หยุดพักวิดีโอไว้ก่อน
+                video.pause();
+            });
+        });
+    </script>
+</body>
+</html>
